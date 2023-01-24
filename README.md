@@ -1,10 +1,10 @@
 # Automated Segmentation of Deep Brain Nuclei using Convolutional Neural Networks and Susceptibility Weighted Imaging
 
 ## Background
-The current repository contains the code used to train and evaluate the segmentation framework present in the paper "Automated Segmentation of Deep Brain Nuclei using Convolutional Neural Networks and Susceptibility Weighted Imaging". This framework implements three different U-Net architectures (3D U-Net, V-Net, and U-Net++) as well as an ensemble of these models (EMMA) to perform the segmentation of the dentate nucleus, red nucleus, substantia nigra, and the subthalamic nuclei from SW images. It uses a two steps approach to 1) localize the regions on lower resolution images, and 2) segment the regions from full resolution images.
+The current repository contains the code used to train and evaluate the segmentation framework (SWI-CNN) presented in the paper "Automated Segmentation of Deep Brain Nuclei using Convolutional Neural Networks and Susceptibility Weighted Imaging". This framework implements three different U-Net architectures (3D U-Net, V-Net, and U-Net++) as well as an ensemble of these models (EMMA) to perform the segmentation of the dentate nucleus, red nucleus, substantia nigra, and the subthalamic nuclei from SW images. It uses a two steps approach to 1) localize the regions on lower resolution images, and 2) segment the regions from full resolution images.
 
 ## Installation
-1. Clone this repository. Download trained models (from https://download.i-med.ac.at/neuro/archive/swi-cnn.tar.gz) and extract in main directory.
+1. Clone this repository. Download the trained models (from https://download.i-med.ac.at/neuro/archive/swi-cnn.tar.gz) and extract them in the main directory.
 2.  Install Python 3 and the following dependencies:
 ```
 python=3.7.5
@@ -111,8 +111,14 @@ All segmentation models (including all folds and final models) and corresponding
 Although not ideal, some parameters are hard coded and must be changed directly in the code. This includes, among others, the number of folds for cross-validation, the number of epochs, the batch size, the initial learning rate, and the step decay for training. This behavior will be improved in subsequent iterations of the code.
 
 ## Citations
+
+Please cite the following papers if you end up using the code or models in this repository:
+
+SWI-CNN:
+* Beliveau, V., Nørgaard, M., Birkl, C., Seppi, K., & Scherfler, C. (2021). Automated segmentation of deep brain nuclei using convolutional neural networks and susceptibility weighted imaging, Human Brain Mapping, Vol. 42, No. 15, pp. 4809-4822. https://doi.org/10.1002/hbm.25604
+
 3D Unet:
-* Çiçek, Ö., Abdulkadir, A., Lienkamp, S. S., Brox, T., & Ronneberger, O. (2016). 3D U-Net: Learning Dense Volumetric Segmentation from Sparse Annotation. In Lecture Notes in Computer Science (including subseries Lecture Notes in Artificial Intelligence and Lecture Notes in Bioinformatics) (pp. 424–432). https://doi.org/10.1007/978-3-319-46723-8_49
+* Çiçek, Ö., Abdulkadir, A., Lienkamp, S. S., Brox, T., & Ronneberger, O. (2016). 3D U-Net: Learning Dense Volumetric Segmentation from Sparse Annotation. In Lecture Notes in Computer Science (including subseries Lecture Notes in Artificial Intelligence and Lecture Notes in Bioinformatics) 424–432. https://doi.org/10.1007/978-3-319-46723-8_49
 
 V-Net:
 * Milletari, F., Navab, N., & Ahmadi, S.-A. (2016). V-Net: Fully Convolutional Neural Networks for Volumetric Medical Image Segmentation. 2016 Fourth International Conference on 3D Vision (3DV), 565–571. https://doi.org/10.1109/3DV.2016.79
