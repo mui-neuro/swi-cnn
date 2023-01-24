@@ -4,7 +4,7 @@
 The current repository contains the code used to train and evaluate the segmentation framework (SWI-CNN) presented in the paper "Automated Segmentation of Deep Brain Nuclei using Convolutional Neural Networks and Susceptibility Weighted Imaging". This framework implements three different U-Net architectures (3D U-Net, V-Net, and U-Net++) as well as an ensemble of these models (EMMA) to perform the segmentation of the dentate nucleus, red nucleus, substantia nigra, and the subthalamic nuclei from SW images. It uses a two steps approach to 1) localize the regions on lower resolution images, and 2) segment the regions from full resolution images.
 
 ## Installation
-1. Clone this repository. Download the trained models (from https://download.i-med.ac.at/neuro/archive/swi-cnn.tar.gz) and extract them in the main directory.
+1. Clone this repository. Download the trained models (from https://download.i-med.ac.at/neuro/archive/swi-cnn_models.tar.gz) and extract them in the main directory.
 2.  Install Python 3 and the following dependencies:
 ```
 python=3.7.5
