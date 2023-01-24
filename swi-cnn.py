@@ -423,8 +423,3 @@ if args.label_regions:
     config['ensemble_dir'] = join(config['main_dir'], 'labels', 'ensemble')
     ut.ensemble_regions(config)
 
-
-""" Data augmentation training """
-total_batches = config['n_epochs']*config['batch_size']
-batches_per_augment = len(subjects)*2*(n_folds-1)/n_folds
-config['n_augment'] = np.ceil(total_batches/batches_per_augment).astype(int)
