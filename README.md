@@ -31,9 +31,9 @@ Different versions of the packages should not significantly alter the framework,
 
 3.  Install [ANTs N4BiasFieldCorrection](https://github.com/stnava/ANTs/releases) (required for pre-processing)
 
-4. Add the fullpath of the ```swi-cnn/src```  to your ```PATH``` envorinment variable, i.e. by adding
+4. Add the fullpath of the ```swi-cnn```  to your ```PATH``` envorinment variable, i.e. by adding
 ```
-export PATH=$PATH:<fullpath>/swi-cnn/src
+export PATH=$PATH:<fullpath>/swi-cnn
 ```
 to your .basrch file.
 
