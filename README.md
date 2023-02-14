@@ -1,7 +1,7 @@
 # Automated Segmentation of Deep Brain Nuclei using Convolutional Neural Networks and Susceptibility Weighted Imaging
 
 ## Background
-The current repository contains the code used to train and evaluate the segmentation framework (SWI-CNN) presented in the paper "Automated Segmentation of Deep Brain Nuclei using Convolutional Neural Networks and Susceptibility Weighted Imaging". This framework implements three different U-Net architectures (3D U-Net, V-Net, and U-Net++) as well as an ensemble of these models (EMMA) to perform the segmentation of the dentate nucleus, red nucleus, substantia nigra, and the subthalamic nuclei from SW images. It uses a two steps approach to 1) localize the regions on lower resolution images, and 2) segment the regions from full resolution images.
+The current repository contains the code used to train and evaluate the segmentation framework (SWI-CNN) presented in the paper "Automated Segmentation of Deep Brain Nuclei using Convolutional Neural Networks and Susceptibility Weighted Imaging". This framework implements five different U-Net architectures (3D U-Net, V-Net, U-Net++, FC-Dense Net, and Dilated FC-Dense Net) as well as an ensemble of these models (EMMA) to perform the segmentation of the dentate nucleus (DEN), red nucleus (RN), substantia nigra (SN), and the subthalamic nuclei (STN) from SW images. It uses a two steps approach to 1) localize the regions on lower resolution images, and 2) segment the regions from full resolution images. This framework allows for the prediction of individual regions and well as the prediction of multiple closely located regions (RN, SN, STN).
 
 ## Installation
 1. Clone this repository. Download the trained models (from https://download.i-med.ac.at/neuro/archive/swi-cnn_models.tar.gz) and extract them in the main directory.
@@ -25,6 +25,8 @@ conda create -n swi-cnn python=3.7.5 tensorflow-gpu=1.15.0 keras=2.2.4 numpy=1.1
 conda activate swi-cnn
 conda install -c conda-forge scikit-image=0.15.0
 pip install antspyx==0.2.2
+git clone https://github.com/deepmind/surface-distance.git
+pip install surface-distance/
 ```
 
 Different versions of the packages should not significantly alter the framework, nonetheless, we report here what versions were used for reproducibility. We note that the ```tensowflow=1.15.0``` dependency was critical for us to enable large models with our Nvidia Titan V GPU. The current approach did not work with ```tensorflow=2.0```.
@@ -125,6 +127,12 @@ V-Net:
 
 U-Net++:
  * Zhou, Z., Siddiquee, M. M. R., Tajbakhsh, N., & Liang, J. (2019). UNet++: Redesigning Skip Connections to Exploit Multiscale Features in Image Segmentation. IEEE Transactions on Medical Imaging, 1–1. https://doi.org/10.1109/TMI.2019.2959609
+
+FC-Dense Net:
+* Jegou, S., Drozdzal, M., Vazquez, D., Romero, A., & Bengio, Y. (2017). The one hundred layers tiramisu: Fully convolutional DenseNets for semantic segmentation. Proceedings of IEEE Conference on Computer Vision and Pattern Recognition Workshops (CVPRW), 1175–1183. https://doi.org/10.1109/CVPRW.2017.156
+
+Dilated FC-Dense Net:
+Kim, J., Patriat, R., Kaplan, J., Solomon, O., & Harel, N. (2020). Deep cerebellar nuclei segmentation via semi-supervised deep context-aware learning from 7T diffusion MRI. IEEE Access, 8, 101550–101568. https://doi.org/10.1109/ACCESS.2020.2998537
 
 EMMA:
 * Kamnitsas, K., Bai, W., Ferrante, E., McDonagh, S., Sinclair, M., Pawlowski, N., … Glocker, B. (2018). Ensembles of multiple models and architectures for robust brain tumour segmentation. Lecture Notes in Computer Science, 10670 LNCS, 450–462. https://doi.org/10.1007/978-3-319-75238-9_38
