@@ -1,5 +1,6 @@
 import ants
 import gc
+import faulthandler
 
 import numpy as np
 import scipy as sp
@@ -20,28 +21,28 @@ except:
 
 reload(ut)
 
+faulthandler.enable()
 
-def augment_data(config, n_augment=None):
+custom_objects = {'dice_coefficient_loss': dice_coefficient_loss,
+                  'dice_coefficient': dice_coefficient}
+
+
+def augment_data(config, n_augment=None, labels=None):
 
     """ Augment image using nonlinear warping and left/right flip """
 
     for ns, subject in enumerate(config['dataset']['subjects']):
 
-        if config['augment']:
-            x_out = [join(config['augment_dir'], subject,
-                          'x_%i.nii.gz' % (n_augment*2)),
-                     join(config['augment_dir'], subject,
-                          'x_%i.nii.gz' % (n_augment*2+1))]
-            y_out = [join(config['augment_dir'],
-                          subject, 'y_%i.nii.gz' % (n_augment*2)),
-                     join(config['augment_dir'], subject,
-                          'y_%i.nii.gz' % (n_augment*2+1))]
+        if n_augment is None:
+            x_out = join(config['augment_dir'], subject, 'x.nii.gz')
+            y_out = join(config['augment_dir'], subject, 'y.nii.gz')
         else:
-            x_out = [join(config['augment_dir'], subject, 'x.nii.gz')]
-            y_out = [join(config['augment_dir'], subject, 'y.nii.gz')]
+            x_out = join(
+                config['augment_dir'], subject, 'x_%i.nii.gz' % n_augment)
+            y_out = join(
+                config['augment_dir'], subject, 'y_%i.nii.gz' % n_augment)
 
-        if (np.any([not isfile(x_) for x_ in x_out]) or
-                np.any([not isfile(y_) for y_ in y_out])):
+        if not isfile(x_out) or not isfile(y_out):
 
             data = ants.image_read(config['dataset']['data'][ns])
             truth = ants.image_read(config['dataset']['truth'][ns])
@@ -51,37 +52,33 @@ def augment_data(config, n_augment=None):
                 raise ValueError('Non isotropic volume %s' %
                                  config['dataset']['data'][ns])
 
-            if config['augment']:
-
-                data_list = [data.numpy(), truth.numpy()]
-                order = [3, 0]
-                data_deformed = ut.elastic_transform(data_list, 500, 10,
-                                                     order=order)
-
-                # Cast to ants object
-                data_ = data.new_image_like(data_deformed[0])
-                truth_ = truth.new_image_like(data_deformed[1].astype(float))
-
-            else:
+            if n_augment is None:
                 data_ = data
                 truth_ = truth
+            else:
+                data_list = [data.numpy(), truth.numpy()]
+                order = [3, 0]
+                data_deformed = ut.elastic_transform(data_list,
+                                                     500, 10,
+                                                     order=order)
 
-            print(x_out[0])
-            ants.image_write(data_, x_out[0])
-            ants.image_write(truth_, y_out[0])
+                # Flip LR
+                if np.random.choice([True, False]):
+                    data_ = data.new_image_like(data_deformed[0][::-1, ...])
+                    truth_ = truth.new_image_like(
+                       ut.flip_labels_lr(
+                        data_deformed[1].astype(float)[::-1, ...], labels))
+                else:
+                    data_ = data.new_image_like(data_deformed[0])
+                    truth_ = truth.new_image_like(
+                        data_deformed[1].astype(float))
 
-            # Flip LR
-            if config['augment']:
-                data_lr = data_.new_image_like(data_.numpy()[::-1, ...])
-                truth_lr = truth_.new_image_like(
-                               ut.flip_labels_lr(truth_.numpy()[::-1, ...],
-                                                 config['labels']))
-                print(x_out[1])
-                ants.image_write(data_lr, x_out[1])
-                ants.image_write(truth_lr, y_out[1])
+            print(x_out)
+            ants.image_write(data_, x_out)
+            ants.image_write(truth_, y_out)
 
 
-def augment_dataset(config):
+def augment_dataset(config, labels, n_augment=None):
 
     """ Wrapper for augment_data """
 
@@ -89,228 +86,214 @@ def augment_dataset(config):
     for subject in config['dataset']['subjects']:
         ut.assert_dir(join(config['augment_dir'], subject))
 
-    if config['augment']:
-        params = list(product([config], range(config['n_augment'])))
+    if n_augment is None:
+        augment_data(config)
+    else:
+        params = list(product([config], range(n_augment), [labels]))
         with Pool(processes=config['n_jobs']) as pool:
             pool.starmap(augment_data, params)
-    else:
-        augment_data(config)
 
 
-def downsample_data(config, n_augment=None):
+def downsample_training_data(config, subjects, n_augment=None):
 
     """ Downsample data """
 
-    for ns, subject in enumerate(config['dataset']['subjects']):
+    if n_augment is not None:
+        print('Processing augment %i' % n_augment)
 
-        print(subject)
+    for ns, subject in enumerate(subjects):
 
-        if config['augment']:
-            x_in = [join(config['augment_dir'], subject,
-                         'x_%i.nii.gz' % (n_augment*2)),
-                    join(config['augment_dir'], subject,
-                         'x_%i.nii.gz' % (n_augment*2+1))]
-            y_in = [join(config['augment_dir'], subject,
-                         'y_%i.nii.gz' % (n_augment*2)),
-                    join(config['augment_dir'], subject,
-                         'y_%i.nii.gz' % (n_augment*2+1))]
-            x_out = [join(config['downsample_dir'], subject,
-                          'x_%i.nii.gz' % (n_augment*2)),
-                     join(config['downsample_dir'], subject,
-                          'x_%i.nii.gz' % (n_augment*2+1))]
-            y_out = [join(config['downsample_dir'], subject,
-                          'y_%i.nii.gz' % (n_augment*2)),
-                     join(config['downsample_dir'], subject,
-                          'y_%i.nii.gz' % (n_augment*2+1))]
+        if n_augment is None:
+            x_in = join(config['augment_dir'], subject, 'x.nii.gz')
+            y_in = join(config['augment_dir'], subject, 'y.nii.gz')
+            x_out = join(config['downsample_dir'], subject, 'x.nii.gz')
+            y_out = join(config['downsample_dir'], subject, 'y.nii.gz')
+
         else:
-            x_in = [join(config['augment_dir'], subject, 'x.nii.gz')]
-            y_in = [join(config['augment_dir'], subject, 'y.nii.gz')]
-            x_out = [join(config['downsample_dir'], subject, 'x.nii.gz')]
-            y_out = [join(config['downsample_dir'], subject, 'y.nii.gz')]
+            x_in = join(config['augment_dir'], subject,
+                        'x_%i.nii.gz' % n_augment)
+            y_in = join(config['augment_dir'], subject,
+                        'y_%i.nii.gz' % n_augment)
+            x_out = join(config['downsample_dir'], subject,
+                         'x_%i.nii.gz' % n_augment)
+            y_out = join(config['downsample_dir'], subject,
+                         'y_%i.nii.gz' % n_augment)
 
-        if (np.any([not isfile(x_) for x_ in x_out]) or
-                np.any([not isfile(y_) for y_ in y_out])):
-
-            for x_in_, y_in_, x_out_, y_out_ in zip(x_in, y_in, x_out, y_out):
-
-                data = ants.image_read(x_in_)
-                truth = ants.image_read(y_in_)
-
-                # Downsample
-                data_down = ants.resample_image(data, config['down_res'],
-                                                interp_type=4)
-
-                truth_down = ants.resample_image(truth, config['down_res'],
-                                                 interp_type=1)
-
-                data_down = ut.adjust_shape(data_down,
-                                            config['downsample_shape'])
-                truth_down = ut.adjust_shape(truth_down,
-                                             config['downsample_shape'])
-
-                ants.image_write(data_down, x_out_)
-                ants.image_write(truth_down, y_out_)
+        if not isfile(x_out) or not isfile(y_out):
+            ut.downsample_nifti(config, x_in, x_out, y_in, y_out)
 
 
-def downsample_dataset(config):
+def downsample_training_dataset(config, subjects, n_augment=None):
 
     """ Wrapper for downsample_data """
 
     ut.assert_dir(config['downsample_dir'])
-    for subject in config['dataset']['subjects']:
+    for subject in subjects:
         ut.assert_dir(join(config['downsample_dir'], subject))
 
-    if config['augment']:
-        params = list(product([config], range(config['n_augment'])))
-        with Pool(processes=config['n_jobs']) as pool:
-            pool.starmap(downsample_data, params)
+    if n_augment is None:
+        downsample_training_data(config, subjects)
     else:
-        downsample_data(config)
+        params = list(product([config], [subjects], range(n_augment)))
+        if config['n_jobs'] > 1:
+            with Pool(processes=config['n_jobs']) as pool:
+                pool.starmap(downsample_training_data, params)
+        else:
+            for params_ in params:
+                downsample_training_data(*params_)
 
 
-def generate_patch_batch(config, n_augment=None):
+def generate_patch_batch(config, subjects, labels, n_augment=None):
 
     """ Create batches for the training of the patch extraction models """
 
-    # Binarize y according to the regions of interest
-    for ns, subject in enumerate(config['dataset']['subjects']):
+    if n_augment is not None:
+        print('Processing augment %i' % n_augment)
 
-        if config['augment']:
-            x_in = join(config['augment_dir'], subject,
-                        'x_%i.nii.gz' % (n_augment*2))
-            y_in = [join(config['downsample_dir'], subject,
-                         'y_%i.nii.gz' % (n_augment*2)),
-                    join(config['downsample_dir'], subject,
-                         'y_%i.nii.gz' % (n_augment*2+1))]
+    for ns, subject in enumerate(subjects):
+
+        if n_augment is None:
+            x_down = join(config['downsample_dir'], subject, 'x.nii.gz')
+            y_full = join(config['augment_dir'], subject, 'y.nii.gz')
         else:
-            x_in = join(config['augment_dir'], subject, 'x.nii.gz')
-            y_in = [join(config['downsample_dir'], subject, 'y.nii.gz')]
+            x_down = join(config['downsample_dir'], subject,
+                          'x_%i.nii.gz' % n_augment)
+            y_full = join(config['augment_dir'], subject,
+                          'y_%i.nii.gz' % n_augment)
 
-        data_spacing = ants.image_read(x_in).spacing
+        y = ants.image_read(y_full)
+        y_conform = None
+        x = None
 
-        for y_in_ in y_in:
+        for region in labels:
 
-            img = ants.image_read(y_in_)
-            truth = img.numpy()
+            if n_augment is None:
+                patch_out = join(config['batches_dir'], region, subject,
+                                 'y.nii.gz')
+            else:
+                patch_out = join(config['batches_dir'], region, subject,
+                                 'y_%i.nii.gz' % n_augment)
 
-            for region in config['labels']:
+            if not isfile(patch_out) or config['overwrite']:
 
-                label_out = join(config['batches_dir'], region, subject, y_in_.split('/')[-1])
+                # Crop y to downsample shape
+                if y_conform is None:
+                    conform_shape = (np.floor(config['downsample_shape'] *
+                                     np.array(config['down_res']) /
+                                     config['full_res']))
+                    y_conform = ut.adjust_shape(y, conform_shape)
 
-                if not isfile(label_out) or config['overwrite']:
+                # Find center of mass
+                mask = np.isin(y_conform.numpy(), labels[region]).astype(float)
+                com = np.array(sp.ndimage.measurements.center_of_mass(mask))
 
-                    labels = config['labels'][region]
-                    if not isinstance(labels, list):
-                        labels = [labels]
+                # Calculate corresponding coordinates in downsampeld space
+                com_down = com * config['full_res'] / config['down_res']
 
-                    # Binarize truth mask
-                    mask = np.zeros_like(truth)
-                    for label in labels:
-                        mask = np.logical_or(mask, truth == label)
-
-                    com = np.array(sp.ndimage.measurements.center_of_mass(
-                                    mask.astype(float)))
-                    winsize = np.multiply(config['patch_shape'],
-                                          data_spacing)/img.spacing
-                    steps = np.ceil(com - winsize/2.).astype(int)
-
-                    focus = np.zeros(img.shape)
-                    view = view_as_windows(focus, winsize)
-                    view[steps[0], steps[1], steps[2], ...] = 1.
-
-                    ants.image_write(img.new_image_like(focus), label_out)
+                # Create binary patch
+                winsize = (np.array(config['patch_shape']) *
+                           config['full_res'] / config['down_res'])
+                steps = np.ceil(com_down - winsize/2.).astype(int)
+                if x is None:
+                    x = ants.image_read(x_down)
+                patch = np.zeros(x.shape)
+                view = view_as_windows(patch, winsize)
+                view[steps[0], steps[1], steps[2], ...] = 1.
+                ants.image_write(x.new_image_like(patch), patch_out)
 
 
-def preallocate_patch_batches(config):
+def preallocate_patch_batches(config, subjects, labels, n_augment=None):
 
     """ Wrapper for generate_patch_batch """
 
     ut.assert_dir(config['batches_dir'])
-    for region in config['labels']:
+    for region in labels:
         ut.assert_dir(join(config['batches_dir'], region))
-        for subject in config['dataset']['subjects']:
+        for subject in subjects:
             ut.assert_dir(join(config['batches_dir'], region, subject))
 
-    if config['augment']:
-        params = list(product([config], range(config['n_augment'])))
+    if n_augment is None:
+        generate_patch_batch(config, subjects, labels)
+    else:
+        params = list(product(
+            [config], [subjects], [labels], range(n_augment)))
+        # if config['n_jobs'] > 1:
         with Pool(processes=config['n_jobs']) as pool:
             pool.starmap(generate_patch_batch, params)
-    else:
-        generate_patch_batch(config)
+        # else:
+        #     for params_ in params:
+        #         generate_patch_batch(*params_)
 
 
 def crop_region_batches(config, region, model, n_augment=None):
 
     """ Create a patch centered on a region by cropping the image """
 
-    label = config['labels'][region]
+    labels = config['labels'][region]
+    if not isinstance(labels, list):
+        labels = [labels]
 
     for ns, subject in enumerate(config['dataset']['subjects']):
 
-        if config['augment']:
-            x_in = [join(config['augment_dir'], subject,
-                         'x_%i.nii.gz' % (n_augment*2)),
-                    join(config['augment_dir'], subject,
-                         'x_%i.nii.gz' % (n_augment*2+1))]
-            x_down = [join(config['downsample_dir'], subject,
-                           'x_%i.nii.gz' % (n_augment*2)),
-                      join(config['downsample_dir'], subject,
-                           'x_%i.nii.gz' % (n_augment*2+1))]
-            y_in = [join(config['augment_dir'], subject,
-                         'y_%i.nii.gz' % (n_augment*2)),
-                    join(config['augment_dir'], subject,
-                         'y_%i.nii.gz' % (n_augment*2+1))]
-            x_out = [join(config['batches_dir'], region, subject,
-                          'x_%i.nii.gz' % (n_augment*2)),
-                     join(config['batches_dir'], region, subject,
-                          'x_%i.nii.gz' % (n_augment*2+1))]
-            y_out = [join(config['batches_dir'], region, subject,
-                          'y_%i.nii.gz' % (n_augment*2)),
-                     join(config['batches_dir'], region, subject,
-                          'y_%i.nii.gz' % (n_augment*2+1))]
+        if n_augment is None:
+            x_in = join(config['augment_dir'], subject, 'x.nii.gz')
+            x_down = join(config['downsample_dir'], subject, 'x.nii.gz')
+            y_in = join(config['augment_dir'], subject, 'y.nii.gz')
+            x_out = join(config['batches_dir'], region, subject, 'x.nii.gz')
+            y_out = join(config['batches_dir'], region, subject, 'y.nii.gz')
         else:
-            x_in = [join(config['augment_dir'], subject, 'x.nii.gz')]
-            x_down = [join(config['downsample_dir'], subject, 'x.nii.gz')]
-            y_in = [join(config['augment_dir'], subject, 'y.nii.gz')]
-            x_out = [join(config['batches_dir'], region, subject, 'x.nii.gz')]
-            y_out = [join(config['batches_dir'], region, subject, 'y.nii.gz')]
+            x_in = join(config['augment_dir'], subject,
+                        'x_%i.nii.gz' % n_augment)
+            x_down = join(config['downsample_dir'], subject,
+                          'x_%i.nii.gz' % n_augment)
+            y_in = join(config['augment_dir'], subject,
+                        'y_%i.nii.gz' % n_augment)
+            x_out = join(config['batches_dir'], region, subject,
+                         'x_%i.nii.gz' % n_augment)
+            y_out = join(config['batches_dir'], region, subject,
+                         'y_%i.nii.gz' % n_augment)
 
-        if (np.any([not isfile(x_) for x_ in x_out]) or
-                np.any([not isfile(y_) for y_ in y_out])):
+        if not isfile(x_out) or not isfile(y_out):
 
-            for x_in_, x_down_, y_in_, x_out_, y_out_ in \
-                    zip(x_in, x_down, y_in, x_out, y_out):
+            x = ants.image_read(x_in)
+            y = ants.image_read(y_in).numpy()
 
-                x = ants.image_read(x_in_)
-                y = ants.image_read(y_in_).numpy()
+            # Extract focus
+            x_pred = ants.image_read(x_down)
+            y_pred = model.predict_on_batch(
+                        np.expand_dims(np.expand_dims(
+                            x_pred.numpy(), axis=0), axis=0))
+            patch = x_pred.new_image_like(y_pred[0, 0, ...])
+            patch_up = ants.resample_image(patch, x.spacing,
+                                           interp_type=4)
+            patch_up = ut.adjust_shape(patch_up, x.shape)
+            com = sp.ndimage.measurements.center_of_mass(patch_up.numpy())
+            steps = np.floor(
+                com - np.array(config['patch_shape'])/2.).astype(int)
 
-                # Extract focus
-                x_pred = ants.image_read(x_down_)
-                y_pred = model.predict_on_batch(
-                            np.expand_dims(np.expand_dims(
-                                x_pred.numpy(), axis=0), axis=0))
-                patch = x_pred.new_image_like(y_pred[0, 0, ...])
-                patch_up = ants.resample_image(patch, x.spacing,
-                                               interp_type=4)
-                patch_up = ut.adjust_shape(patch_up, x.shape)
-                com = sp.ndimage.measurements.center_of_mass(patch_up.numpy())
-                steps = np.floor(com - np.array(config['patch_shape'])/2.).astype(int)
+            # Mask label
+            if len(labels) == 1:
+                y_bin = (y == labels[0]).astype(float)
+            else:
+                # Mask all regions
+                mask = np.ones_like(y, dtype=bool)
+                for label in labels:
+                    mask[y == label] = False
+                y_bin = y.copy()
+                y_bin[mask] = 0.
 
-                # Mask label
-                y_bin = (y == label).astype(float)
+            # Extract views on focus
+            x_ = view_as_windows(x.numpy(), config['patch_shape'])[
+                            steps[0], steps[1], steps[2]]
+            y_ = view_as_windows(y_bin, config['patch_shape'])[
+                            steps[0], steps[1], steps[2]]
 
-                # Extract views on focus
-                x_ = view_as_windows(x.numpy(), config['patch_shape'])[
-                                steps[0], steps[1], steps[2]]
-                y_ = view_as_windows(y_bin, config['patch_shape'])[
-                                steps[0], steps[1], steps[2]]
-
-                print(x_out_)
-                ut.save_like_ants(x_, x, x_out_)
-                ut.save_like_ants(y_, x, y_out_)
+            print(x_out)
+            ut.save_like_ants(x_, x, x_out)
+            ut.save_like_ants(y_, x, y_out)
 
 
-def preallocate_region_batches(config):
+def preallocate_region_batches(config, n_augment=None):
 
     """ Wrapper for crop_region_batches """
 
@@ -324,8 +307,7 @@ def preallocate_region_batches(config):
                                         '%s.h5' % region))
 
         ut.reset_keras()
-        custom_objects = {'dice_coefficient_loss': dice_coefficient_loss,
-                          'dice_coefficient': dice_coefficient}
+
         model = load_model(join(config['patch_models_dir'], '%s.h5' % region),
                            custom_objects=custom_objects,
                            compile=False)
@@ -334,41 +316,254 @@ def preallocate_region_batches(config):
         for subject in config['dataset']['subjects']:
             ut.assert_dir(join(config['batches_dir'], region, subject))
 
-        if config['augment']:
-            for n_augment in range(config['n_augment']):
-                crop_region_batches(config, region, model, n_augment=n_augment)
-        else:
+        if n_augment is None:
             crop_region_batches(config, region, model)
+        else:
+            for na in range(n_augment):
+                crop_region_batches(config, region, model, n_augment=na)
 
         del model
         print(gc.collect())
 
 
-def fetch_batch(x_dir, y_dir, subjects, region, indices=None):
+def crop_mixed_region_batches(config, model, subjects, labels, n_augment=None):
+
+    """ Create a patch centered on a region by cropping the image """
+
+    for subject in subjects:
+
+        if n_augment is None:
+            x_full = join(config['augment_dir'], subject, 'x.nii.gz')
+            y_full = join(config['augment_dir'], subject, 'y.nii.gz')
+            x_down = join(config['downsample_dir'], subject, 'x.nii.gz')
+        else:
+            x_full = join(
+                config['augment_dir'], subject, 'x_%i.nii.gz' % n_augment)
+            y_full = join(
+                config['augment_dir'], subject, 'y_%i.nii.gz' % n_augment)
+            x_down = join(
+                config['downsample_dir'], subject, 'x_%i.nii.gz' % n_augment)
+
+        y_pred = None
+
+        for nr, region in enumerate(labels):
+
+            out_dir = join(config['batches_dir'], region, subject)
+            ut.assert_dir(out_dir)
+
+            if n_augment is None:
+                x_out = join(out_dir, 'x.nii.gz')
+                y_out = join(out_dir, 'y.nii.gz')
+            else:
+                x_out = join(out_dir, 'x_%i.nii.gz' % n_augment)
+
+                y_out = join(out_dir, 'y_%i.nii.gz' % n_augment)
+
+            if not isfile(x_out) or not isfile(y_out):
+
+                x_full_ = ants.image_read(x_full)
+                y_full_ = ants.image_read(y_full).numpy()
+                x_down_ = ants.image_read(x_down)
+
+                # Get prediction of patch location
+                if y_pred is None:
+                    y_pred = model.predict_on_batch(
+                        np.expand_dims(np.expand_dims(
+                            x_down_.numpy(), axis=0), axis=0))
+
+                # Extract focus
+                patch_down = x_down_.new_image_like(y_pred[0, nr, ...])
+                patch_full = ants.resample_image(patch_down,
+                                                 x_full_.spacing,
+                                                 interp_type=4)
+                patch_full = ut.adjust_shape(patch_full, x_full_.shape)
+                com = sp.ndimage.measurements.center_of_mass(
+                    patch_full.numpy())
+                steps = np.floor(
+                    com - np.array(config['patch_shape'])/2.).astype(int)
+
+                # Extract views on focus
+                x = view_as_windows(
+                    x_full_.numpy(), config['patch_shape'])[
+                                steps[0], steps[1], steps[2]]
+                y = view_as_windows(
+                    y_full_, config['patch_shape'])[
+                                steps[0], steps[1], steps[2]]
+
+                print(x_out)
+                ut.save_like_ants(x, x_full_, x_out)
+                ut.save_like_ants(y, x_full_, y_out)
+
+
+def preallocate_mixed_region_batches(config,
+                                     patch_model,
+                                     subjects,
+                                     labels,
+                                     n_augment=None):
+
+    """ Wrapper for crop_region_batches """
+
+    print('Cropping patches...')
+
+    ut.assert_dir(config['batches_dir'])
+
+    print('Loading model ' + patch_model)
+
+    ut.reset_keras()
+
+    model = load_model(patch_model,
+                       custom_objects=custom_objects,
+                       compile=False)
+
+    if n_augment is None:
+        crop_mixed_region_batches(config,
+                                  model,
+                                  subjects,
+                                  labels)
+    else:
+        for na in range(n_augment):
+            crop_mixed_region_batches(config,
+                                      model,
+                                      subjects,
+                                      labels,
+                                      n_augment=na)
+
+    del model
+    print(gc.collect())
+
+
+def fetch_batch(x_dir, y_dir, subjects, labels=None, n_epoch=None):
 
     """ Fetch batch data """
+
+    # if not isinstance(labels, list):
+    #     labels_ = ut.concat_labels(labels, background=True)
 
     x = []
     y = []
 
-    if indices is None:
+    if n_epoch is None:
+
         for subject in subjects:
             fx = join(x_dir, subject, 'x.nii.gz')
             fy = join(y_dir, subject, 'y.nii.gz')
 
             x.append(np.expand_dims(ants.image_read(fx).numpy(), axis=0))
-            y.append(np.expand_dims(ants.image_read(fy).numpy(), axis=0))
+            if labels is None:
+                y.append(np.expand_dims(ants.image_read(fy).numpy(), axis=0))
+            elif isinstance(labels, int):
+                y.append(np.expand_dims(
+                    np.isin(ants.image_read(fy).numpy(), labels), axis=0))
+            else:
+                y.append(ut.expand_labels(ants.image_read(fy).numpy(),
+                                          labels=labels))
+
     else:
 
-        subjects_ = subjects[[i % len(subjects) for i in indices]]
-        indices_ = np.floor(indices/len(subjects)).astype(int)
+        for subject in subjects:
 
-        for subject, i in zip(subjects_, indices_):
-
-            fx = join(x_dir, subject, 'x_%i.nii.gz' % i)
-            fy = join(y_dir, subject, 'y_%i.nii.gz' % i)
+            fx = join(x_dir, subject, 'x_%i.nii.gz' % n_epoch)
+            fy = join(y_dir, subject, 'y_%i.nii.gz' % n_epoch)
 
             x.append(np.expand_dims(ants.image_read(fx).numpy(), axis=0))
-            y.append(np.expand_dims(ants.image_read(fy).numpy(), axis=0))
+            if labels is None:
+                y.append(np.expand_dims(ants.image_read(fy).numpy(), axis=0))
+            elif isinstance(labels, int):
+                y.append(np.expand_dims(
+                    np.isin(ants.image_read(fy).numpy(), labels), axis=0))
+            else:
+                y.append(ut.expand_labels(ants.image_read(fy).numpy(),
+                                          labels=labels))
+
+    return np.stack(x, axis=0), np.stack(y, axis=0)
+
+
+def fetch_mixed_batch(batch_type, x_dir, y_dir, subjects, labels,
+                      region=None,
+                      n_labels=None,
+                      n_epoch=None):
+
+    """ Fetch batch data """
+
+    if isinstance(labels, list):
+        regions = labels
+    else:
+        if region is None:
+            regions = np.array(list(labels.keys()))
+        else:
+            regions = [region]
+
+    x = []
+    y = []
+
+    if batch_type == 'test':
+
+        if isinstance(labels, list):
+
+            for subject in subjects:
+
+                fx = join(x_dir, subject, 'x.nii.gz')
+                x.append(np.expand_dims(ants.image_read(fx).numpy(), axis=0))
+                y_ = []
+
+                for region in regions:
+                    fy = join(y_dir[region], subject, 'y.nii.gz')
+                    y_.append(ants.image_read(fy).numpy())
+
+                y.append(np.stack(y_, axis=0))
+
+        else:
+
+            for subject in subjects:
+                for region in regions:
+
+                    fx = join(x_dir[region], subject, 'x.nii.gz')
+                    fy = join(y_dir[region], subject, 'y.nii.gz')
+
+                    x.append(np.expand_dims(
+                        ants.image_read(fx).numpy(), axis=0))
+
+                    y.append(ut.expand_labels(ants.image_read(fy).numpy(),
+                                              labels=labels[region],
+                                              n_labels=n_labels))
+
+    elif batch_type == 'train':
+
+        if isinstance(labels, list):
+
+            for subject in subjects:
+
+                fx = join(x_dir, subject, 'x_%i.nii.gz' % n_epoch)
+                x.append(np.expand_dims(ants.image_read(fx).numpy(), axis=0))
+                y_ = []
+
+                # DEBUG
+                # print(fx)
+
+                for region in regions:
+                    fy = join(y_dir[region], subject, 'y_%i.nii.gz' % n_epoch)
+                    y_.append(ants.image_read(fy).numpy())
+                    # print(fy)
+
+                y.append(np.stack(y_, axis=0))
+
+        else:
+
+            for subject in subjects:
+                for region in regions:
+
+                    fx = join(x_dir[region], subject, 'x_%i.nii.gz' % n_epoch)
+                    fy = join(y_dir[region], subject, 'y_%i.nii.gz' % n_epoch)
+
+                    # print(fx)
+                    # print(fy)
+
+                    x.append(np.expand_dims(
+                        ants.image_read(fx).numpy(), axis=0))
+
+                    y.append(ut.expand_labels(
+                        ants.image_read(fy).numpy(),
+                        labels=labels[region],
+                        n_labels=n_labels))
 
     return np.stack(x, axis=0), np.stack(y, axis=0)
