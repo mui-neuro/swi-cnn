@@ -1,7 +1,7 @@
 # Automated Segmentation of Deep Brain Nuclei using Convolutional Neural Networks and Susceptibility Weighted Imaging
 
 ## Background
-The current repository contains the code used to train and evaluate the segmentation framework (SWI-CNN) presented in the paper "Automated Segmentation of Deep Brain Nuclei using Convolutional Neural Networks and Susceptibility Weighted Imaging". This framework implements five different U-Net architectures (3D U-Net, V-Net, U-Net++, FC-Dense Net, and Dilated FC-Dense Net) as well as an ensemble of these models (EMMA) to perform the segmentation of the dentate nucleus (DEN), red nucleus (RN), substantia nigra (SN), and the subthalamic nuclei (STN) from SW images. It uses a two steps approach to 1) localize the regions on lower resolution images, and 2) segment the regions from full resolution images. This framework allows for the prediction of individual regions and well as the prediction of multiple closely located regions (RN, SN, STN).
+The current repository contains the code used to train and evaluate the segmentation framework (SWI-CNN) presented in the paper "Automated Segmentation of Deep Brain Nuclei using Convolutional Neural Networks and Susceptibility Weighted Imaging". This framework implements five different U-Net architectures (3D U-Net, V-Net, U-Net++, FC-Dense Net, and Dilated FC-Dense Net) as well as an ensemble of these models (EMMA) to perform the segmentation of the dentate nucleus (DEN), red nucleus (RN), substantia nigra (SN), and the subthalamic nuclei (STN) from SW images. It uses a two steps approach to 1) localize the regions on lower resolution images, and 2) segment the regions from full resolution images. This framework allows for the prediction of individual regions as well as the prediction of multiple anatomically close regions (RN, SN, STN).
 
 ## Installation
 1. Clone this repository. Download the trained models (from https://download.i-med.ac.at/neuro/archive/swi-cnn_models.tar.gz) and extract them in the main directory.
@@ -132,7 +132,7 @@ FC-Dense Net:
 * Jegou, S., Drozdzal, M., Vazquez, D., Romero, A., & Bengio, Y. (2017). The one hundred layers tiramisu: Fully convolutional DenseNets for semantic segmentation. Proceedings of IEEE Conference on Computer Vision and Pattern Recognition Workshops (CVPRW), 1175–1183. https://doi.org/10.1109/CVPRW.2017.156
 
 Dilated FC-Dense Net:
-Kim, J., Patriat, R., Kaplan, J., Solomon, O., & Harel, N. (2020). Deep cerebellar nuclei segmentation via semi-supervised deep context-aware learning from 7T diffusion MRI. IEEE Access, 8, 101550–101568. https://doi.org/10.1109/ACCESS.2020.2998537
+* Kim, J., Patriat, R., Kaplan, J., Solomon, O., & Harel, N. (2020). Deep cerebellar nuclei segmentation via semi-supervised deep context-aware learning from 7T diffusion MRI. IEEE Access, 8, 101550–101568. https://doi.org/10.1109/ACCESS.2020.2998537
 
 EMMA:
 * Kamnitsas, K., Bai, W., Ferrante, E., McDonagh, S., Sinclair, M., Pawlowski, N., … Glocker, B. (2018). Ensembles of multiple models and architectures for robust brain tumour segmentation. Lecture Notes in Computer Science, 10670 LNCS, 450–462. https://doi.org/10.1007/978-3-319-75238-9_38
