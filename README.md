@@ -47,7 +47,7 @@ Pre-processing of the SW images (i.e. resampling to isotropic resolution, brain 
 ```
 swi-cnn.py -s example_subject --preproc
 ```
-The preprocessde images are stored in the ```preproc``` directory. The normalized SW image is named ```preproc/example_subject_brain_norm.nii.gz```.
+The preprocessed images are stored in the ```preproc``` directory. The normalized SW image is named ```preproc/example_subject_brain_norm.nii.gz```.
 
 ### 2. Labeling
 Labeling of the pre-processed SW images is performed with the command
