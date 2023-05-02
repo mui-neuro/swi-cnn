@@ -52,7 +52,7 @@ The preprocessde images are stored in the ```preproc``` directory. The normalize
 ### 2. Labeling
 Labeling of the pre-processed SW images is performed with the command
 ```
-swi-cnn.py --s example_subject --label_regions
+swi-cnn.py --s example_subject --label_patches --label_regions
 ```
 This will perform the patch selection and subsequent region labeling for each region. The final labels for each model are stored in the corresponding ```labels/<model>``` directory.
 
